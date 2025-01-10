@@ -18,10 +18,7 @@ contract ObscurusTest is Test, SafeTestTools {
         (obscurusSingleton, moduleProxyFactory) = (new DeployScript()).run();
     }
 
-    function _setupObscurus(
-        uint256[] memory safeOwnerPKs,
-        uint256 obscurusThreshold
-    ) internal returns (Obscurus) {
+    function _setupObscurus(uint256[] memory safeOwnerPKs, uint256 obscurusThreshold) internal returns (Obscurus) {
         SafeInstance memory safeInstance = _setupSafe({
             ownerPKs: safeOwnerPKs,
             threshold: 1,
@@ -39,8 +36,7 @@ contract ObscurusTest is Test, SafeTestTools {
         });
 
         bytes memory obscurusModuleSetupCall = abi.encodeWithSelector(
-            obscurusSingleton.setUp.selector,
-            abi.encode(address(safeInstance.safe), obscurusThreshold)
+            obscurusSingleton.setUp.selector, abi.encode(address(safeInstance.safe), obscurusThreshold)
         );
 
         address obscurusModule = moduleProxyFactory.deployModule({
@@ -65,12 +61,7 @@ contract ObscurusTest is Test, SafeTestTools {
         address recipient = address(0xA11c3);
         uint256 value = 1 ether;
 
-        obscurus.obscureExecAndReturnData({
-            to: recipient,
-            value: value,
-            data: "",
-            operation: Enum.Operation.Call
-        });
+        obscurus.obscureExecAndReturnData({to: recipient, value: value, data: "", operation: Enum.Operation.Call});
 
         assertEq(recipient.balance, value);
     }

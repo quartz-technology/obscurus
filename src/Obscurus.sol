@@ -16,10 +16,7 @@ contract Obscurus is Module {
 
     function setUp(bytes memory initializeParams) public override initializer {
         __Ownable_init(msg.sender);
-        (address _safe, uint256 _threshold) = abi.decode(
-            initializeParams,
-            (address, uint256)
-        );
+        (address _safe, uint256 _threshold) = abi.decode(initializeParams, (address, uint256));
 
         setAvatar(_safe);
         setTarget(_safe);
@@ -40,12 +37,10 @@ contract Obscurus is Module {
         _setThreshold(_threshold);
     }
 
-    function obscureExecAndReturnData(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        SafeEnum.Operation operation
-    ) external returns (bool success, bytes memory returnData) {
+    function obscureExecAndReturnData(address to, uint256 value, bytes calldata data, SafeEnum.Operation operation)
+        external
+        returns (bool success, bytes memory returnData)
+    {
         (success, returnData) = execAndReturnData(to, value, data, operation);
     }
 }
