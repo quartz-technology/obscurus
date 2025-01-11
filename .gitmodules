@@ -16,3 +16,15 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/Vectorized/solady
+[submodule "lib/semaphore"]
+	path = lib/semaphore
+	url = https://github.com/semaphore-protocol/semaphore
+[submodule "lib/zk-kit.solidity"]
+	path = lib/zk-kit.solidity
+	url = https://github.com/privacy-scaling-explorations/zk-kit.solidity
+[submodule "lib/poseidon-solidity"]
+	path = lib/poseidon-solidity
+	url = https://github.com/chancehudson/poseidon-solidity
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts

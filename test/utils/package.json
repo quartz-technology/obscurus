@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@semaphore-protocol/core": "^4.0.3",
+    "commander": "^12.1.0",
+    "viem": "^2.19.6"
+  }
+}
