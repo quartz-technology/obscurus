@@ -23,19 +23,13 @@ contract DeployScript is Script {
         vm.startBroadcast();
 
         semaphoreVerifier = new SemaphoreVerifier();
-        semaphore = new Semaphore(
-            ISemaphoreVerifier(address(semaphoreVerifier))
-        );
+        semaphore = new Semaphore(ISemaphoreVerifier(address(semaphoreVerifier)));
 
         uint256[] memory identities = new uint256[](1);
         identities[0] = 1;
 
-        obscurusSingleton = new Obscurus({
-            _safe: address(0x01),
-            _semaphore: address(semaphore),
-            _threshold: 1,
-            _identities: identities
-        });
+        obscurusSingleton =
+            new Obscurus({_safe: address(0x01), _semaphore: address(semaphore), _threshold: 1, _identities: identities});
         moduleProxyFactory = new ModuleProxyFactory();
 
         vm.stopBroadcast();

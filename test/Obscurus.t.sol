@@ -14,12 +14,7 @@ import {DeployScript} from "../script/Deploy.s.sol";
 import "../src/Obscurus.sol";
 import "../src/Errors.sol";
 
-contract ObscurusTest is
-    Test,
-    SafeTestTools,
-    SemaphoreCheats,
-    SemaphoreCheatsUtils
-{
+contract ObscurusTest is Test, SafeTestTools, SemaphoreCheats, SemaphoreCheatsUtils {
     using SafeTestLib for SafeInstance;
 
     SemaphoreVerifier semaphoreVerifier;
@@ -28,12 +23,7 @@ contract ObscurusTest is
     ModuleProxyFactory private moduleProxyFactory;
 
     function setUp() public {
-        (
-            semaphoreVerifier,
-            semaphore,
-            obscurusSingleton,
-            moduleProxyFactory
-        ) = (new DeployScript()).run();
+        (semaphoreVerifier, semaphore, obscurusSingleton, moduleProxyFactory) = (new DeployScript()).run();
     }
 
     function _setupObscurus(
@@ -60,12 +50,7 @@ contract ObscurusTest is
 
         bytes memory obscurusModuleSetupCall = abi.encodeWithSelector(
             obscurusSingleton.setUp.selector,
-            abi.encode(
-                address(safeInstance.safe),
-                _semaphore,
-                _threshold,
-                _identities
-            )
+            abi.encode(address(safeInstance.safe), _semaphore, _threshold, _identities)
         );
 
         address obscurusModule = moduleProxyFactory.deployModule({
@@ -86,42 +71,22 @@ contract ObscurusTest is
         uint256 obscurusThreshold = 1;
         uint256 numIdentities = 3;
 
-        (
-            SemaphoreCheatIdentity[] memory identities,
-            uint256[] memory identitiesCommitments
-        ) = generateIdentitiesFull(numIdentities);
+        (SemaphoreCheatIdentity[] memory identities, uint256[] memory identitiesCommitments) =
+            generateIdentitiesFull(numIdentities);
 
-        Obscurus obscurus = _setupObscurus(
-            ownerPKs,
-            address(semaphore),
-            obscurusThreshold,
-            identitiesCommitments
-        );
+        Obscurus obscurus = _setupObscurus(ownerPKs, address(semaphore), obscurusThreshold, identitiesCommitments);
 
         address recipient = address(0xA11c3);
         uint256 value = 1 ether;
 
-        uint256 scope = obscurus.computeScope(
-            recipient,
-            value,
-            "",
-            Enum.Operation.Call
-        );
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
         uint256 signal = obscurus.computeSignal();
 
-        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](
-            numIdentities
-        );
-        ISemaphore.SemaphoreProof[]
-            memory proofs = new ISemaphore.SemaphoreProof[](numIdentities);
+        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](numIdentities);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](numIdentities);
 
         for (uint256 i = 0; i < numIdentities; i++) {
-            cheatProofs[i] = generateProof(
-                identities[i],
-                identities,
-                Strings.toString(signal),
-                Strings.toString(scope)
-            );
+            cheatProofs[i] = generateProof(identities[i], identities, Strings.toString(signal), Strings.toString(scope));
             proofs[i] = ISemaphore.SemaphoreProof({
                 merkleTreeDepth: cheatProofs[i].merkleTreeDepth,
                 merkleTreeRoot: cheatProofs[i].merkleTreeRoot,
@@ -150,40 +115,22 @@ contract ObscurusTest is
         uint256 obscurusThreshold = 2;
         uint256 numIdentities = 3;
 
-        (
-            SemaphoreCheatIdentity[] memory identities,
-            uint256[] memory identitiesCommitments
-        ) = generateIdentitiesFull(numIdentities);
+        (SemaphoreCheatIdentity[] memory identities, uint256[] memory identitiesCommitments) =
+            generateIdentitiesFull(numIdentities);
 
-        Obscurus obscurus = _setupObscurus(
-            ownerPKs,
-            address(semaphore),
-            obscurusThreshold,
-            identitiesCommitments
-        );
+        Obscurus obscurus = _setupObscurus(ownerPKs, address(semaphore), obscurusThreshold, identitiesCommitments);
 
         address recipient = address(0xA11c3);
         uint256 value = 1 ether;
 
-        uint256 scope = obscurus.computeScope(
-            recipient,
-            value,
-            "",
-            Enum.Operation.Call
-        );
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
         uint256 signal = obscurus.computeSignal();
 
         SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](1);
-        ISemaphore.SemaphoreProof[]
-            memory proofs = new ISemaphore.SemaphoreProof[](1);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](1);
 
         for (uint256 i = 0; i < 1; i++) {
-            cheatProofs[i] = generateProof(
-                identities[i],
-                identities,
-                Strings.toString(signal),
-                Strings.toString(scope)
-            );
+            cheatProofs[i] = generateProof(identities[i], identities, Strings.toString(signal), Strings.toString(scope));
             proofs[i] = ISemaphore.SemaphoreProof({
                 merkleTreeDepth: cheatProofs[i].merkleTreeDepth,
                 merkleTreeRoot: cheatProofs[i].merkleTreeRoot,
@@ -211,42 +158,22 @@ contract ObscurusTest is
         uint256 obscurusThreshold = 2;
         uint256 numIdentities = 3;
 
-        (
-            SemaphoreCheatIdentity[] memory identities,
-            uint256[] memory identitiesCommitments
-        ) = generateIdentitiesFull(numIdentities);
+        (SemaphoreCheatIdentity[] memory identities, uint256[] memory identitiesCommitments) =
+            generateIdentitiesFull(numIdentities);
 
-        Obscurus obscurus = _setupObscurus(
-            ownerPKs,
-            address(semaphore),
-            obscurusThreshold,
-            identitiesCommitments
-        );
+        Obscurus obscurus = _setupObscurus(ownerPKs, address(semaphore), obscurusThreshold, identitiesCommitments);
 
         address recipient = address(0xA11c3);
         uint256 value = 1 ether;
 
-        uint256 scope = obscurus.computeScope(
-            recipient,
-            value,
-            "",
-            Enum.Operation.Call
-        );
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
         uint256 signal = obscurus.computeSignal();
 
-        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](
-            numIdentities
-        );
-        ISemaphore.SemaphoreProof[]
-            memory proofs = new ISemaphore.SemaphoreProof[](numIdentities);
+        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](numIdentities);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](numIdentities);
 
         for (uint256 i = 0; i < numIdentities; i++) {
-            cheatProofs[i] = generateProof(
-                identities[i],
-                identities,
-                Strings.toString(signal),
-                Strings.toString(scope)
-            );
+            cheatProofs[i] = generateProof(identities[i], identities, Strings.toString(signal), Strings.toString(scope));
             proofs[i] = ISemaphore.SemaphoreProof({
                 merkleTreeDepth: cheatProofs[i].merkleTreeDepth,
                 merkleTreeRoot: cheatProofs[i].merkleTreeRoot,

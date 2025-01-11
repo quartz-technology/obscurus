@@ -15,32 +15,15 @@ contract Obscurus is Module {
     uint256 threshold;
     uint256 public groupID;
 
-    constructor(
-        address _safe,
-        address _semaphore,
-        uint256 _threshold,
-        uint256[] memory _identities
-    ) {
-        bytes memory initializeParams = abi.encode(
-            _safe,
-            _semaphore,
-            _threshold,
-            _identities
-        );
+    constructor(address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) {
+        bytes memory initializeParams = abi.encode(_safe, _semaphore, _threshold, _identities);
         setUp(initializeParams);
     }
 
     function setUp(bytes memory initializeParams) public override initializer {
         __Ownable_init(msg.sender);
-        (
-            address _safe,
-            address _semaphore,
-            uint256 _threshold,
-            uint256[] memory _identities
-        ) = abi.decode(
-                initializeParams,
-                (address, address, uint256, uint256[])
-            );
+        (address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) =
+            abi.decode(initializeParams, (address, address, uint256, uint256[]));
 
         setAvatar(_safe);
         setTarget(_safe);
@@ -76,40 +59,20 @@ contract Obscurus is Module {
         semaphore.addMembers(groupID, identityCommitments);
     }
 
-    function addMembers(
-        uint256[] memory identityCommitments
-    ) external onlyOwner {
+    function addMembers(uint256[] memory identityCommitments) external onlyOwner {
         _addMembers(identityCommitments);
     }
 
-    function computeScope(
-        address to,
-        uint256 value,
-        bytes memory data,
-        SafeEnum.Operation operation
-    ) public view returns (uint256) {
+    function computeScope(address to, uint256 value, bytes memory data, SafeEnum.Operation operation)
+        public
+        view
+        returns (uint256)
+    {
         Safe safe = Safe(payable(address(avatar)));
         uint256 nonce = safe.nonce();
-        bytes32 safeTxHash = safe.getTransactionHash(
-            to,
-            value,
-            data,
-            operation,
-            0,
-            0,
-            0,
-            address(0),
-            payable(0),
-            nonce
-        );
+        bytes32 safeTxHash = safe.getTransactionHash(to, value, data, operation, 0, 0, 0, address(0), payable(0), nonce);
         bytes32 messageHash = keccak256(
-            (
-                bytes.concat(
-                    "\x19Ethereum Signed Message:\n",
-                    "66",
-                    bytes(abi.encode(safeTxHash).toHexString())
-                )
-            )
+            (bytes.concat("\x19Ethereum Signed Message:\n", "66", bytes(abi.encode(safeTxHash).toHexString())))
         );
 
         return uint256(messageHash);

@@ -22,10 +22,7 @@ contract SemaphoreCheats is CommonBase {
         uint256[8] points;
     }
 
-    function generateIdentity()
-        internal
-        returns (SemaphoreCheatIdentity memory)
-    {
+    function generateIdentity() internal returns (SemaphoreCheatIdentity memory) {
         string[] memory inputs = new string[](4);
 
         inputs[0] = "npx";
@@ -36,23 +33,13 @@ contract SemaphoreCheats is CommonBase {
         bytes memory json = vm.ffi(inputs);
 
         uint256 commitment = vm.parseJsonUint(string(json), ".commitment");
-        string memory privateKey = vm.parseJsonString(
-            string(json),
-            ".privateKey"
-        );
+        string memory privateKey = vm.parseJsonString(string(json), ".privateKey");
 
-        return
-            SemaphoreCheatIdentity({
-                commitment: commitment,
-                privateKey: privateKey
-            });
+        return SemaphoreCheatIdentity({commitment: commitment, privateKey: privateKey});
     }
 
-    function generateIdentitiesFull(
-        uint256 n
-    ) internal returns (SemaphoreCheatIdentity[] memory, uint256[] memory) {
-        SemaphoreCheatIdentity[]
-            memory identities = new SemaphoreCheatIdentity[](n);
+    function generateIdentitiesFull(uint256 n) internal returns (SemaphoreCheatIdentity[] memory, uint256[] memory) {
+        SemaphoreCheatIdentity[] memory identities = new SemaphoreCheatIdentity[](n);
         uint256[] memory identitiesValue = new uint256[](n);
 
         for (uint256 i; i < n; i++) {
@@ -63,9 +50,7 @@ contract SemaphoreCheats is CommonBase {
         return (identities, identitiesValue);
     }
 
-    function generateIdentityFromSecret(
-        string memory _secret
-    ) internal returns (SemaphoreCheatIdentity memory) {
+    function generateIdentityFromSecret(string memory _secret) internal returns (SemaphoreCheatIdentity memory) {
         string[] memory inputs = new string[](6);
 
         inputs[0] = "npx";
@@ -78,21 +63,12 @@ contract SemaphoreCheats is CommonBase {
         bytes memory json = vm.ffi(inputs);
 
         uint256 commitment = vm.parseJsonUint(string(json), ".commitment");
-        string memory privateKey = vm.parseJsonString(
-            string(json),
-            ".privateKey"
-        );
+        string memory privateKey = vm.parseJsonString(string(json), ".privateKey");
 
-        return
-            SemaphoreCheatIdentity({
-                commitment: commitment,
-                privateKey: privateKey
-            });
+        return SemaphoreCheatIdentity({commitment: commitment, privateKey: privateKey});
     }
 
-    function generateGroup(
-        SemaphoreCheatIdentity[] memory _identities
-    ) internal returns (SemaphoreCheatGroup memory) {
+    function generateGroup(SemaphoreCheatIdentity[] memory _identities) internal returns (SemaphoreCheatGroup memory) {
         string[] memory inputs = new string[](5 + _identities.length);
 
         inputs[0] = "npx";
@@ -138,33 +114,23 @@ contract SemaphoreCheats is CommonBase {
 
         bytes memory json = vm.ffi(inputs);
 
-        uint256 merkleTreeDepth = vm.parseJsonUint(
-            string(json),
-            ".merkleTreeDepth"
-        );
-        uint256 merkleTreeRoot = vm.parseJsonUint(
-            string(json),
-            ".merkleTreeRoot"
-        );
+        uint256 merkleTreeDepth = vm.parseJsonUint(string(json), ".merkleTreeDepth");
+        uint256 merkleTreeRoot = vm.parseJsonUint(string(json), ".merkleTreeRoot");
         uint256 nullifier = vm.parseJsonUint(string(json), ".nullifier");
         uint256 message = vm.parseJsonUint(string(json), ".message");
-        uint256[] memory jsonPoints = vm.parseJsonUintArray(
-            string(json),
-            ".points"
-        );
+        uint256[] memory jsonPoints = vm.parseJsonUintArray(string(json), ".points");
         uint256[8] memory points;
 
         for (uint256 i = 0; i < jsonPoints.length; i++) {
             points[i] = jsonPoints[i];
         }
 
-        return
-            SemaphoreCheatProof({
-                merkleTreeDepth: merkleTreeDepth,
-                merkleTreeRoot: merkleTreeRoot,
-                nullifier: nullifier,
-                message: message,
-                points: points
-            });
+        return SemaphoreCheatProof({
+            merkleTreeDepth: merkleTreeDepth,
+            merkleTreeRoot: merkleTreeRoot,
+            nullifier: nullifier,
+            message: message,
+            points: points
+        });
     }
 }
