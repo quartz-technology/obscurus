@@ -23,6 +23,14 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install Node
+        uses: actions/setup-node@v4
+
+      - name: Install test-util dependencies
+        run: |
+          npm install
+        working-directory: test/utils
+
       - name: Show Forge version
         run: |
           forge --version
@@ -39,5 +47,5 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          forge test -vvv
+          forge test --ffi -vvv
         id: test
