@@ -1,103 +1,61 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.27;
 
-import {Test, console} from "forge-std/Test.sol";
-import "safe-tools/SafeTestTools.sol";
-import {SemaphoreCheats} from "./SemaphoreCheats.sol";
-import {SemaphoreCheatsUtils} from "./SemaphoreCheatsUtils.sol";
-import {ModuleProxyFactory} from "zodiac/factory/ModuleProxyFactory.sol";
-import {SemaphoreVerifier} from "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
-import {Strings} from "openzeppelin/contracts/utils/Strings.sol";
+import "./sol-utils/TestDeployer.t.sol";
+import {SemaphoreCheats} from "./sol-utils/SemaphoreCheats.sol";
+import {TestUtils} from "./sol-utils/TestUtils.sol";
 
-import {DeployScript} from "../script/Deploy.s.sol";
-import "../src/Obscurus.sol";
-import "../src/Errors.sol";
-
-contract ObscurusTest is Test, SafeTestTools, SemaphoreCheats, SemaphoreCheatsUtils {
-    using SafeTestLib for SafeInstance;
-
-    SemaphoreVerifier semaphoreVerifier;
-    ISemaphore semaphore;
-    Obscurus private obscurusSingleton;
-    ModuleProxyFactory private moduleProxyFactory;
+contract ObscurusTest is TestDeployer, SemaphoreCheats, TestUtils {
+    uint256 private threshold;
+    SemaphoreCheatIdentity private alice;
+    SemaphoreCheatIdentity private bob;
+    SemaphoreCheatIdentity private pierre;
 
     function setUp() public {
-        (semaphoreVerifier, semaphore, obscurusSingleton, moduleProxyFactory) = (new DeployScript()).run();
+        threshold = 2;
+        alice = generateIdentity();
+        bob = generateIdentity();
+        pierre = generateIdentity();
+
+        deploy(threshold, _getAllIdentityCommitments());
     }
 
-    function _setupObscurus(
-        uint256[] memory safeOwnerPKs,
-        address _semaphore,
-        uint256 _threshold,
-        uint256[] memory _identities
-    ) internal returns (Obscurus) {
-        SafeInstance memory safeInstance = _setupSafe({
-            ownerPKs: safeOwnerPKs,
-            threshold: 1,
-            initialBalance: 1 ether,
-            advancedParams: AdvancedSafeInitParams({
-                includeFallbackHandler: true,
-                initData: "",
-                saltNonce: 100,
-                setupModulesCall_to: address(0),
-                setupModulesCall_data: "",
-                refundAmount: 0,
-                refundToken: address(0),
-                refundReceiver: payable(address(0))
-            })
-        });
+    function _getAllIdentities() internal view returns (SemaphoreCheatIdentity[] memory) {
+        SemaphoreCheatIdentity[] memory identities = new SemaphoreCheatIdentity[](3);
 
-        bytes memory obscurusModuleSetupCall = abi.encodeWithSelector(
-            obscurusSingleton.setUp.selector,
-            abi.encode(address(safeInstance.safe), _semaphore, _threshold, _identities)
-        );
+        identities[0] = alice;
+        identities[1] = bob;
+        identities[2] = pierre;
 
-        address obscurusModule = moduleProxyFactory.deployModule({
-            masterCopy: address(obscurusSingleton),
-            initializer: obscurusModuleSetupCall,
-            saltNonce: 0
-        });
-
-        safeInstance.enableModule(obscurusModule);
-
-        return Obscurus(obscurusModule);
+        return identities;
     }
 
-    function test_obscureExecAndReturnData() public {
-        uint256[] memory ownerPKs = new uint256[](1);
-        ownerPKs[0] = 12345;
+    function _getAllIdentityCommitments() internal view returns (uint256[] memory) {
+        SemaphoreCheatIdentity[] memory identities = _getAllIdentities();
+        uint256[] memory identityCommitments = new uint256[](identities.length);
 
-        uint256 obscurusThreshold = 1;
-        uint256 numIdentities = 3;
-
-        (SemaphoreCheatIdentity[] memory identities, uint256[] memory identitiesCommitments) =
-            generateIdentitiesFull(numIdentities);
-
-        Obscurus obscurus = _setupObscurus(ownerPKs, address(semaphore), obscurusThreshold, identitiesCommitments);
-
-        address recipient = address(0xA11c3);
-        uint256 value = 1 ether;
-
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        uint256 signal = obscurus.computeSignal();
-
-        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](numIdentities);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](numIdentities);
-
-        for (uint256 i = 0; i < numIdentities; i++) {
-            cheatProofs[i] = generateProof(identities[i], identities, Strings.toString(signal), Strings.toString(scope));
-            proofs[i] = ISemaphore.SemaphoreProof({
-                merkleTreeDepth: cheatProofs[i].merkleTreeDepth,
-                merkleTreeRoot: cheatProofs[i].merkleTreeRoot,
-                nullifier: cheatProofs[i].nullifier,
-                message: cheatProofs[i].message,
-                scope: scope,
-                points: cheatProofs[i].points
-            });
+        for (uint256 i = 0; i < identityCommitments.length; i++) {
+            identityCommitments[i] = identities[i].commitment;
         }
 
-        obscurus.obscureExecAndReturnData({
+        return identityCommitments;
+    }
+
+    function test_obscureTransfer() public {
+        address recipient = address(0xDEADBEEF);
+        vm.deal(recipient, 0);
+
+        uint256 value = 1 ether;
+
+        uint256 signal = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+
+        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
+        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
+        proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
+
+        (bool success,) = obscurus.obscureExecAndReturnData({
             to: recipient,
             value: value,
             data: "",
@@ -105,41 +63,53 @@ contract ObscurusTest is Test, SafeTestTools, SemaphoreCheats, SemaphoreCheatsUt
             proofs: proofs
         });
 
+        assertEq(success, true);
         assertEq(recipient.balance, value);
+        assertEq(safeInstance.safe.nonce(), 1);
     }
 
-    function test_cannot_obscureExecAndReturnDataWithNotEnoughProofs() public {
-        uint256[] memory ownerPKs = new uint256[](1);
-        ownerPKs[0] = 12345;
+    function test_multiObscureTransfer() public {
+        vm.deal(address(safeInstance.safe), 3 ether);
 
-        uint256 obscurusThreshold = 2;
-        uint256 numIdentities = 3;
+        address recipient = address(0xDEADBEEF);
+        vm.deal(recipient, 0);
 
-        (SemaphoreCheatIdentity[] memory identities, uint256[] memory identitiesCommitments) =
-            generateIdentitiesFull(numIdentities);
-
-        Obscurus obscurus = _setupObscurus(ownerPKs, address(semaphore), obscurusThreshold, identitiesCommitments);
-
-        address recipient = address(0xA11c3);
         uint256 value = 1 ether;
 
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        uint256 signal = obscurus.computeSignal();
+        for (uint256 i = 0; i < 3; i++) {
+            uint256 signal = obscurus.computeSignal();
+            uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
+            ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
 
-        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](1);
+            proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
+            proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
+            proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
+
+            (bool success,) = obscurus.obscureExecAndReturnData({
+                to: recipient,
+                value: value,
+                data: "",
+                operation: Enum.Operation.Call,
+                proofs: proofs
+            });
+
+            assertEq(success, true);
+            assertEq(obscurus.nonce(), i + 1);
+            assertEq(recipient.balance, value * (i + 1));
+        }
+    }
+
+    function test_cannot_execWithoutMissingProofs() public {
+        address recipient = address(0xDEADBEEF);
+        vm.deal(recipient, 0);
+
+        uint256 value = 1 ether;
+
+        uint256 signal = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
         ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](1);
 
-        for (uint256 i = 0; i < 1; i++) {
-            cheatProofs[i] = generateProof(identities[i], identities, Strings.toString(signal), Strings.toString(scope));
-            proofs[i] = ISemaphore.SemaphoreProof({
-                merkleTreeDepth: cheatProofs[i].merkleTreeDepth,
-                merkleTreeRoot: cheatProofs[i].merkleTreeRoot,
-                nullifier: cheatProofs[i].nullifier,
-                message: cheatProofs[i].message,
-                scope: scope,
-                points: cheatProofs[i].points
-            });
-        }
+        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
 
         vm.expectRevert(NotEnoughProofs.selector);
         obscurus.obscureExecAndReturnData({
@@ -149,43 +119,27 @@ contract ObscurusTest is Test, SafeTestTools, SemaphoreCheats, SemaphoreCheatsUt
             operation: Enum.Operation.Call,
             proofs: proofs
         });
+
+        assertEq(recipient.balance, 0);
+        assertEq(obscurus.nonce(), 0);
     }
 
-    function test_cannot_obscureExecAndReturnDataWithInvalidProof() public {
-        uint256[] memory ownerPKs = new uint256[](1);
-        ownerPKs[0] = 12345;
+    function test_cannot_execWithInvalidProof() public {
+        address recipient = address(0xDEADBEEF);
+        vm.deal(recipient, 0);
 
-        uint256 obscurusThreshold = 2;
-        uint256 numIdentities = 3;
-
-        (SemaphoreCheatIdentity[] memory identities, uint256[] memory identitiesCommitments) =
-            generateIdentitiesFull(numIdentities);
-
-        Obscurus obscurus = _setupObscurus(ownerPKs, address(semaphore), obscurusThreshold, identitiesCommitments);
-
-        address recipient = address(0xA11c3);
         uint256 value = 1 ether;
 
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
         uint256 signal = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
 
-        SemaphoreCheatProof[] memory cheatProofs = new SemaphoreCheatProof[](numIdentities);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](numIdentities);
+        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
+        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
+        proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
 
-        for (uint256 i = 0; i < numIdentities; i++) {
-            cheatProofs[i] = generateProof(identities[i], identities, Strings.toString(signal), Strings.toString(scope));
-            proofs[i] = ISemaphore.SemaphoreProof({
-                merkleTreeDepth: cheatProofs[i].merkleTreeDepth,
-                merkleTreeRoot: cheatProofs[i].merkleTreeRoot,
-                nullifier: cheatProofs[i].nullifier,
-                message: cheatProofs[i].message,
-                scope: scope,
-                points: cheatProofs[i].points
-            });
-        }
-
-        // corrupt the first proof
-        cheatProofs[0].points[0] += 1;
+        // Invalidate Alice's proof.
+        proofs[0].points[0] += 1;
 
         vm.expectRevert(ISemaphore.Semaphore__InvalidProof.selector);
         obscurus.obscureExecAndReturnData({
@@ -195,5 +149,8 @@ contract ObscurusTest is Test, SafeTestTools, SemaphoreCheats, SemaphoreCheatsUt
             operation: Enum.Operation.Call,
             proofs: proofs
         });
+
+        assertEq(recipient.balance, 0);
+        assertEq(obscurus.nonce(), 0);
     }
 }

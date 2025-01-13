@@ -3,7 +3,7 @@ pragma solidity 0.8.27;
 
 import {CommonBase} from "forge-std/Base.sol";
 
-contract SemaphoreCheatsUtils is CommonBase {
+contract TestUtils is CommonBase {
     function stringToBytes32(string memory source) internal pure returns (bytes32 result) {
         bytes memory tempEmptyStringTest = bytes(source);
         if (tempEmptyStringTest.length == 0) {

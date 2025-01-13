@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache 2.0
 pragma solidity 0.8.27;
 
+import {Test, console} from "forge-std/Test.sol";
 import {CommonBase} from "forge-std/Base.sol";
 import "openzeppelin/contracts/utils/Strings.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 
 contract SemaphoreCheats is CommonBase {
     struct SemaphoreCheatIdentity {
@@ -27,7 +29,7 @@ contract SemaphoreCheats is CommonBase {
 
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "test/utils/semaphore-cheat-cli.ts";
+        inputs[2] = "test/ts-utils/semaphore-cheat-cli.ts";
         inputs[3] = "generate-identity";
 
         bytes memory json = vm.ffi(inputs);
@@ -55,7 +57,7 @@ contract SemaphoreCheats is CommonBase {
 
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "test/utils/semaphore-cheat-cli.ts";
+        inputs[2] = "test/ts-utils/semaphore-cheat-cli.ts";
         inputs[3] = "generate-group";
         inputs[4] = "--secret";
         inputs[5] = _secret;
@@ -73,7 +75,7 @@ contract SemaphoreCheats is CommonBase {
 
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "test/utils/semaphore-cheat-cli.ts";
+        inputs[2] = "test/ts-utils/semaphore-cheat-cli.ts";
         inputs[3] = "generate-group";
         inputs[4] = "--identities";
 
@@ -91,21 +93,21 @@ contract SemaphoreCheats is CommonBase {
     function generateProof(
         SemaphoreCheatIdentity memory _prover,
         SemaphoreCheatIdentity[] memory _groupIdentities,
-        string memory _message,
-        string memory _scope
-    ) internal returns (SemaphoreCheatProof memory) {
+        uint256 _message,
+        uint256 _scope
+    ) internal returns (ISemaphore.SemaphoreProof memory) {
         string[] memory inputs = new string[](11 + _groupIdentities.length);
 
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "test/utils/semaphore-cheat-cli.ts";
+        inputs[2] = "test/ts-utils/semaphore-cheat-cli.ts";
         inputs[3] = "generate-proof";
         inputs[4] = "--prover";
         inputs[5] = _prover.privateKey;
         inputs[6] = "--scope";
-        inputs[7] = _scope;
+        inputs[7] = Strings.toString(_scope);
         inputs[8] = "--message";
-        inputs[9] = _message;
+        inputs[9] = Strings.toString(_message);
         inputs[10] = "--identities";
 
         for (uint256 i = 0; i < _groupIdentities.length; i++) {
@@ -113,6 +115,8 @@ contract SemaphoreCheats is CommonBase {
         }
 
         bytes memory json = vm.ffi(inputs);
+
+        console.log(string(json));
 
         uint256 merkleTreeDepth = vm.parseJsonUint(string(json), ".merkleTreeDepth");
         uint256 merkleTreeRoot = vm.parseJsonUint(string(json), ".merkleTreeRoot");
@@ -125,11 +129,12 @@ contract SemaphoreCheats is CommonBase {
             points[i] = jsonPoints[i];
         }
 
-        return SemaphoreCheatProof({
+        return ISemaphore.SemaphoreProof({
             merkleTreeDepth: merkleTreeDepth,
             merkleTreeRoot: merkleTreeRoot,
             nullifier: nullifier,
             message: message,
+            scope: _scope,
             points: points
         });
     }
