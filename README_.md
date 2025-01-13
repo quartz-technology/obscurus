@@ -37,18 +37,18 @@ Use at your own risk.
 
 Obscurus is a Zodiac Module (a plugin) that can be attached to a Safe multi-signature Wallet, which provides an alternative to the default mechanism for verifying signatures to approve and execute transactions.
 With Obscurus, a group of anonymous owners, referred to as identities, are controlling the multisig.
-When transactions are approved, nobody can know which one of the identities made the approval, but with the following guarantees
+When transactions are approved, nobody can know which one of the identities made the approval, but with the following guarantees:
 - It is indeed a member of this group.
 - A single identity cannot approve a given transaction more than once.
 
 ### Goal
 
-The goal of Obscurus is to provide anonymity to the Safe Wallet owners, while retaining the mechanisms of the multi-signature wallet.
+The goal of Obscurus is to make the Safe Wallet owners approvals anonymous, while providing the same guarantees of the traditional multisig.
 
 ### Details
 
 Usually in a Safe Wallet, K over M (with K <= M) owners are required to approve and execute a transaction from the multisig.
-Zodiac Modules contain additional logic that can be plugged-in to a Safe Wallet which have the interesting property of being able to bypass the traditional flow of execution.
+Zodiac Modules contain additional logic that can be plugged-in to a Safe Wallet which have the interesting property of being able to bypass the traditional flow of approval and execution.
 The owners signatures are not required anymore, and any arbitrary transaction can be executed by the Safe Wallet via the Zodiac Module.
 
 Here with Obscurus, we combine this Zodiac Module property with the Semaphore framework to give the ability to the owners to prove their membership and send transaction approvals without revealing their original identity.
