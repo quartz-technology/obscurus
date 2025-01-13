@@ -14,6 +14,7 @@ contract Obscurus is Module {
     ISemaphore public semaphore;
     uint256 threshold;
     uint256 public groupID;
+    uint256 public nonce;
 
     constructor(address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) {
         bytes memory initializeParams = abi.encode(_safe, _semaphore, _threshold, _identities);
@@ -24,6 +25,8 @@ contract Obscurus is Module {
         __Ownable_init(msg.sender);
         (address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) =
             abi.decode(initializeParams, (address, address, uint256, uint256[]));
+
+        // TODO: Check if the threshold is <= the number of identities.
 
         setAvatar(_safe);
         setTarget(_safe);
@@ -69,7 +72,6 @@ contract Obscurus is Module {
         returns (uint256)
     {
         Safe safe = Safe(payable(address(avatar)));
-        uint256 nonce = safe.nonce();
         bytes32 safeTxHash = safe.getTransactionHash(to, value, data, operation, 0, 0, 0, address(0), payable(0), nonce);
         bytes32 messageHash = keccak256(
             (bytes.concat("\x19Ethereum Signed Message:\n", "66", bytes(abi.encode(safeTxHash).toHexString())))
@@ -100,6 +102,7 @@ contract Obscurus is Module {
             semaphore.validateProof(groupID, proofs[i]);
         }
 
+        nonce += 1;
         (success, returnData) = execAndReturnData(to, value, data, operation);
     }
 }

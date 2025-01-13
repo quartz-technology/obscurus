@@ -8,3 +8,5 @@ safe-tools/=lib/safe-tools/src/
 solady/=lib/solady/src/
 @semaphore-protocol/=lib/semaphore/packages/contracts/
 @zk-kit/lean-imt.sol/=lib/zk-kit.solidity/packages/lean-imt/contracts/
+
+@src/=src/

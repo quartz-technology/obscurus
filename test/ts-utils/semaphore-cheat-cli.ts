@@ -2,7 +2,6 @@ import { Identity } from "@semaphore-protocol/core";
 import { Group } from "@semaphore-protocol/group";
 import { Command } from "commander";
 import { generateProof } from "@semaphore-protocol/proof";
-import { stringToBytes } from "viem";
 
 const program = new Command();
 
@@ -67,7 +66,7 @@ async function generateCheatProof(prover: string, identities: string[], message:
   const identity = Identity.import(prover);
 
   const group = new Group(identities);
-  const encodedMessage = stringToBytes(message, { size: 32 });
+  const encodedMessage = Number(message);
 
   const proof = await generateProof(identity, group, encodedMessage, scope);
   console.log(JSON.stringify({
