@@ -19,6 +19,12 @@
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Using Anvil Fork](#using-anvil-fork)
+    - [1. Fork a network](#1-fork-a-network)
+    - [2. Depliy a Safe Wallet](#2-deploy-a-safe-wallet)
+    - [3. Deploy Obscurus](#3-deploy-obscurus)
+    - [4. Approve a transaction](#4-approve-a-transaction)
+    - [5. Execute a transaction](#5-execute-a-transaction)
+    - [6. Invalid transactions](#6-invalid-transactions)
 - [Contributing](#contributing)
 - [Authors](#authors)
 
@@ -82,7 +88,7 @@ Please note that for the moment, the only documented way to deploy the project i
 
 Before you can deploy and use Obscurus, you must install a few tools:
 - [Docker](https://docs.docker.com/engine/install/).
-- [Foundry(https://book.getfoundry.sh/getting-started/installation).
+- [Foundry](https://book.getfoundry.sh/getting-started/installation).
 
 Once installed, you can go ahead and follow the steps to deploy and use Obscurus using one of the available methods.
 
