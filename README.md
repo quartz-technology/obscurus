@@ -98,7 +98,7 @@ cast call $ODS_SAFE_ADDRESS "isModuleEnabled(address)(bool)" $ODS_OBSCURUS_ADDRE
 # Should return `true`
 ```
 
-Then, generate the proofs for each one of the Semaphore identity:
+Then, generate the proofs for each one of the Semaphore identity (feel free to replace the `to`, `value`, `data` and `operation` fields to run another transaction. don't forget to reflect the changes in the very next step when executing the transaction using the generated proofs):
 ```shell
 # Identity 0 is Alice.
 npx tsx test/ts-utils/obscurus-cli.ts prove --prover "zBdAt1wUe6DAK1wEXuJqeSyBiTX+UPA4M95TI3F9mIM=" --identities $ODS_IDENTITY_COMMITMENT_0 $ODS_IDENTITY_COMMITMENT_1 $ODS_IDENTITY_COMMITMENT_2 --obscurus-address $ODS_OBSCURUS_ADDRESS --rpc-url $RPC_URL --to "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" --value 0 --data 0x --operation 0 > /tmp/proof-alice.json
