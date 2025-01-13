@@ -26,6 +26,8 @@ contract Obscurus is Module {
         (address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) =
             abi.decode(initializeParams, (address, address, uint256, uint256[]));
 
+        // TODO: Check if the threshold is <= the number of identities.
+
         setAvatar(_safe);
         setTarget(_safe);
         transferOwnership(_safe);
