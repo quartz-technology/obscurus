@@ -223,7 +223,7 @@ In a real world scenario, nothing can link the proofs to their creator and there
 
 #### 6. Invalid transactions
 
-You can also generate only one proof and try to execute the transaction, it will not work:
+You can also generate only one proof and try to execute the transaction, it will not work at the threshold is not met:
 ```shell
 # Identity 0 is Alice.
 npx tsx test/ts-utils/obscurus-cli.ts prove --prover "zBdAt1wUe6DAK1wEXuJqeSyBiTX+UPA4M95TI3F9mIM=" --identities $ODS_IDENTITY_COMMITMENT_0 $ODS_IDENTITY_COMMITMENT_1 $ODS_IDENTITY_COMMITMENT_2 --obscurus-address $ODS_OBSCURUS_ADDRESS --rpc-url $RPC_URL --to "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" --value 0 --data 0x --operation 0 > /tmp/proof-alice.json
