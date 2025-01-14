@@ -145,7 +145,7 @@ async function obscurusGenerateProof(
   const identity = Identity.import(prover);
 
   const group = new Group(identities);
-  const encodedMessage = Number(signal);
+  const encodedMessage = BigInt(signal);
 
   const proof = await generateProof(identity, group, encodedMessage, scope);
 

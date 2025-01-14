@@ -66,7 +66,7 @@ async function generateCheatProof(prover: string, identities: string[], message:
   const identity = Identity.import(prover);
 
   const group = new Group(identities);
-  const encodedMessage = Number(message);
+  const encodedMessage = BigInt(message);
 
   const proof = await generateProof(identity, group, encodedMessage, scope);
   console.log(JSON.stringify({
