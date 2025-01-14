@@ -56,11 +56,11 @@ contract ObscurusTest is TestDeployer, SemaphoreCheats, TestUtils {
         proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
 
         (bool success,) = obscurus.obscureExecAndReturnData({
-            to: recipient,
-            value: value,
-            data: "",
-            operation: Enum.Operation.Call,
-            proofs: proofs
+            _to: recipient,
+            _value: value,
+            _data: "",
+            _operation: Enum.Operation.Call,
+            _proofs: proofs
         });
 
         assertEq(success, true);
@@ -86,11 +86,11 @@ contract ObscurusTest is TestDeployer, SemaphoreCheats, TestUtils {
             proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
 
             (bool success,) = obscurus.obscureExecAndReturnData({
-                to: recipient,
-                value: value,
-                data: "",
-                operation: Enum.Operation.Call,
-                proofs: proofs
+                _to: recipient,
+                _value: value,
+                _data: "",
+                _operation: Enum.Operation.Call,
+                _proofs: proofs
             });
 
             assertEq(success, true);
@@ -113,11 +113,11 @@ contract ObscurusTest is TestDeployer, SemaphoreCheats, TestUtils {
 
         vm.expectRevert(NotEnoughProofs.selector);
         obscurus.obscureExecAndReturnData({
-            to: recipient,
-            value: value,
-            data: "",
-            operation: Enum.Operation.Call,
-            proofs: proofs
+            _to: recipient,
+            _value: value,
+            _data: "",
+            _operation: Enum.Operation.Call,
+            _proofs: proofs
         });
 
         assertEq(recipient.balance, 0);
@@ -143,11 +143,65 @@ contract ObscurusTest is TestDeployer, SemaphoreCheats, TestUtils {
 
         vm.expectRevert(ISemaphore.Semaphore__InvalidProof.selector);
         obscurus.obscureExecAndReturnData({
-            to: recipient,
-            value: value,
-            data: "",
-            operation: Enum.Operation.Call,
-            proofs: proofs
+            _to: recipient,
+            _value: value,
+            _data: "",
+            _operation: Enum.Operation.Call,
+            _proofs: proofs
+        });
+
+        assertEq(recipient.balance, 0);
+        assertEq(obscurus.nonce(), 0);
+    }
+
+    function test_cannot_execWithInvalidScope() public {
+        address recipient = address(0xDEADBEEF);
+        vm.deal(recipient, 0);
+
+        uint256 value = 1 ether;
+
+        uint256 signal = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+
+        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
+        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
+        proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope + 1);
+
+        vm.expectRevert(InvalidScope.selector);
+        obscurus.obscureExecAndReturnData({
+            _to: recipient,
+            _value: value,
+            _data: "",
+            _operation: Enum.Operation.Call,
+            _proofs: proofs
+        });
+
+        assertEq(recipient.balance, 0);
+        assertEq(obscurus.nonce(), 0);
+    }
+
+    function test_cannot_execWithInvalidSignal() public {
+        address recipient = address(0xDEADBEEF);
+        vm.deal(recipient, 0);
+
+        uint256 value = 1 ether;
+
+        uint256 signal = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+
+        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
+        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
+        proofs[2] = generateProof(pierre, _getAllIdentities(), signal + 1, scope);
+
+        vm.expectRevert(InvalidSignal.selector);
+        obscurus.obscureExecAndReturnData({
+            _to: recipient,
+            _value: value,
+            _data: "",
+            _operation: Enum.Operation.Call,
+            _proofs: proofs
         });
 
         assertEq(recipient.balance, 0);
