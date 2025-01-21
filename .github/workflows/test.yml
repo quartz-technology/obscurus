@@ -28,9 +28,10 @@ jobs:
 
       - name: Install test-util dependencies
         run: |
-          npm install
-          npm i -g tsx
-        working-directory: test/ts-utils
+          npm i
+          npm install -g typescript
+          tsc
+        working-directory: tools/obscurus-cli
 
       - name: Show Forge version
         run: |
@@ -43,7 +44,7 @@ jobs:
 
       - name: Run Forge build
         run: |
-          forge build --sizes
+          forge build
         id: build
 
       - name: Run Forge tests
