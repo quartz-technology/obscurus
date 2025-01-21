@@ -25,6 +25,8 @@ jobs:
 
       - name: Install Node
         uses: actions/setup-node@v4
+        with:
+          node-version: 'v22.3.0'
 
       - name: Install test-util dependencies
         run: |
