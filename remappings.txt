@@ -10,3 +10,5 @@ solady/=lib/solady/src/
 @zk-kit/lean-imt.sol/=lib/zk-kit.solidity/packages/lean-imt/contracts/
 
 @src/=src/
+@test-utils/=test/utils/
+@script/=script/
