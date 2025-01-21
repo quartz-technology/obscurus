@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "@types/snarkjs": "^0.7.9",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@semaphore-protocol/group": "^4.8.2",
+    "@semaphore-protocol/identity": "^4.8.2",
+    "@semaphore-protocol/proof": "^4.8.2",
+    "commander": "^13.0.0",
+    "snarkjs": "^0.7.5",
+    "viem": "^2.22.10"
+  }
+}
