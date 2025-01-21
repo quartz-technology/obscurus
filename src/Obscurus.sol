@@ -2,16 +2,13 @@
 pragma solidity 0.8.27;
 
 import {Module} from "zodiac/core/Module.sol";
-import {Safe, Enum as SafeEnum} from "safe-contracts/Safe.sol";
+import {Safe} from "safe-contracts/Safe.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
-import "./Errors.sol";
+import {IObscurus} from "@src/interfaces/IObscurus.sol";
 
-/// @title Obscurus Zodiac Module for Safe Wallet.
-/// @author 0xpanoramix @ Quartz
-/// @notice A module attached to a multisig, managing the group of identities that anonymously approve and execute transactions.
-contract Obscurus is Module {
+contract Obscurus is Module, IObscurus {
     using LibString for bytes;
 
     /*----------------------------------------------------------------------*/
@@ -20,44 +17,15 @@ contract Obscurus is Module {
     /*                                                                      */
     /*----------------------------------------------------------------------*/
 
-    /// @notice TODO: Add a description.
     ISemaphore public semaphore;
 
-    /// @notice TODO: Add a description.
     uint256 public groupID;
 
-    /// @notice TODO: Add a description.
     uint256 public threshold;
 
-    /// @notice TODO: Add a description.
+    uint256 public numIdentities;
+
     uint256 public nonce;
-
-    /*----------------------------------------------------------------------*/
-    /*                                                                      */
-    /*     EVENTS                                                           */
-    /*                                                                      */
-    /*----------------------------------------------------------------------*/
-
-    /// @notice Emitted when a new threshold is set.
-    ///
-    /// @param threshold The new threshold value.
-    event ThresholdSet(uint256 threshold);
-
-    /// @notice Emitted when a new member is added to the group of identities managing the Obscurus Module.
-    ///
-    /// @param identityCommitment The identity commitment of the new member managing the Obscurus Module.
-    event MemberAdded(uint256 identityCommitment);
-
-    /// @notice Emitted when multiple new members are added to the group of identities managing the Obscurus Module.
-    ///
-    /// @param identityCommitments The identity commitments of the new members managing the Obscurus Module.
-    event MembersAdded(uint256[] identityCommitments);
-
-    /// @notice Emitted when a transaction is executed.
-    ///
-    /// @param scope The scope of the transaction.
-    /// @param success The status of the transaction execution.
-    event TransactionExecuted(uint256 scope, bool success);
 
     /*----------------------------------------------------------------------*/
     /*                                                                      */
@@ -65,14 +33,8 @@ contract Obscurus is Module {
     /*                                                                      */
     /*----------------------------------------------------------------------*/
 
-    /// @notice Initializes the Obscurus module with the provided parameters.
-    ///
-    /// @param _safe TODO: Add a description.
-    /// @param _semaphore TODO: Add a description.
-    /// @param _threshold TODO: Add a description.
-    /// @param _identities TODO: Add a description.
-    constructor(address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) {
-        bytes memory initializeParams = abi.encode(_safe, _semaphore, _threshold, _identities);
+    constructor(InitParameters memory params) {
+        bytes memory initializeParams = abi.encode(params);
         setUp(initializeParams);
     }
 
@@ -82,24 +44,19 @@ contract Obscurus is Module {
     /*                                                                      */
     /*----------------------------------------------------------------------*/
 
-    /// @notice TODO: Add a description.
-    ///
-    /// @param initializeParams TODO: Add a description.
     function setUp(bytes memory initializeParams) public override initializer {
         __Ownable_init(msg.sender);
-        (address _safe, address _semaphore, uint256 _threshold, uint256[] memory _identities) =
-            abi.decode(initializeParams, (address, address, uint256, uint256[]));
+        (InitParameters memory params) = abi.decode(initializeParams, (InitParameters));
 
-        // TODO: Check if the threshold is <= the number of identities.
+        setAvatar(params.safe);
+        setTarget(params.safe);
+        transferOwnership(params.safe);
 
-        setAvatar(_safe);
-        setTarget(_safe);
-        transferOwnership(_safe);
-
-        semaphore = ISemaphore(_semaphore);
-        _setThreshold(_threshold);
+        semaphore = ISemaphore(params.semaphore);
         groupID = semaphore.createGroup();
-        _addMembers(_identities);
+
+        _addMembers(params.identities);
+        _setThreshold(params.threshold);
     }
 
     /*----------------------------------------------------------------------*/
@@ -108,22 +65,39 @@ contract Obscurus is Module {
     /*                                                                      */
     /*----------------------------------------------------------------------*/
 
-    /// @notice TODO: Add a description.
-    ///
-    /// @param _to Transaction destination address.
-    /// @param _value Transaction value.
-    /// @param _data Transaction data.
-    /// @param _operation Transaction operation type.
-    ///
-    /// @return TODO: Add a description.
-    function computeScope(address _to, uint256 _value, bytes memory _data, SafeEnum.Operation _operation)
-        public
-        view
-        returns (uint256)
+    function obscureExec(ObscureExecParameters memory params) external override returns (bool) {
+        _preObscureExec(params);
+
+        bool success = exec(
+            params.txParameters.to, params.txParameters.value, params.txParameters.data, params.txParameters.operation
+        );
+
+        _postObscureExec(success, params);
+
+        return success;
+    }
+
+    function obscureExecAndReturnData(ObscureExecParameters memory params)
+        external
+        override
+        returns (bool, bytes memory)
     {
+        _preObscureExec(params);
+
+        (bool success, bytes memory returnData) = execAndReturnData(
+            params.txParameters.to, params.txParameters.value, params.txParameters.data, params.txParameters.operation
+        );
+
+        _postObscureExec(success, params);
+
+        return (success, returnData);
+    }
+
+    function computeScope(TxParameters memory params) public view override returns (uint256) {
         Safe safe = Safe(payable(address(avatar)));
-        bytes32 safeTxHash =
-            safe.getTransactionHash(_to, _value, _data, _operation, 0, 0, 0, address(0), payable(0), nonce);
+        bytes32 safeTxHash = safe.getTransactionHash(
+            params.to, params.value, params.data, params.operation, 0, 0, 0, address(0), payable(0), nonce
+        );
         bytes32 messageHash = keccak256(
             (bytes.concat("\x19Ethereum Signed Message:\n", "66", bytes(abi.encode(safeTxHash).toHexString())))
         );
@@ -131,8 +105,7 @@ contract Obscurus is Module {
         return uint256(messageHash);
     }
 
-    /// @notice TODO: Add a description.
-    function computeSignal() public view returns (uint256) {
+    function computeSignal() public view override returns (uint256) {
         address obscurusAddress = address(this);
         uint256 chainID;
 
@@ -143,46 +116,34 @@ contract Obscurus is Module {
         return uint256(keccak256(abi.encodePacked(obscurusAddress, chainID, nonce)));
     }
 
-    /// @notice TODO: Add a description.
-    ///
-    /// @param _to Transaction destination address.
-    /// @param _value Transaction value.
-    /// @param _data Transaction data.
-    /// @param _operation Transaction operation type.
-    /// @param _proofs TODO: Add a description.
-    ///
-    /// @return success TODO: Add a description.
-    /// @return returnData TODO: Add a description.
-    function obscureExecAndReturnData(
-        address _to,
-        uint256 _value,
-        bytes calldata _data,
-        SafeEnum.Operation _operation,
-        ISemaphore.SemaphoreProof[] memory _proofs
-    ) external returns (bool success, bytes memory returnData) {
-        uint256 scope = computeScope(_to, _value, _data, _operation);
+    function _preObscureExec(ObscureExecParameters memory params) internal {
+        _verifyObscureExec(params);
+        nonce += 1;
+    }
+
+    function _postObscureExec(bool success, ObscureExecParameters memory params) internal {
+        emit ObscureTransactionExecuted(success, params.semaphoreProofs[0].scope);
+    }
+
+    function _verifyObscureExec(ObscureExecParameters memory params) internal {
+        uint256 scope = computeScope(params.txParameters);
         uint256 signal = computeSignal();
 
-        if (_proofs.length < threshold) {
-            revert NotEnoughProofs();
+        if (params.semaphoreProofs.length < threshold) {
+            revert InvalidExecutionNotEnoughProofs();
         }
 
-        for (uint256 i = 0; i < _proofs.length; i++) {
-            if (_proofs[i].scope != scope) {
-                revert InvalidScope();
+        for (uint256 i = 0; i < params.semaphoreProofs.length; i++) {
+            if (params.semaphoreProofs[i].scope != scope) {
+                revert InvalidExecutionScope();
             }
 
-            if (_proofs[i].message != signal) {
-                revert InvalidSignal();
+            if (params.semaphoreProofs[i].message != signal) {
+                revert InvalidExecutionSignal();
             }
 
-            semaphore.validateProof(groupID, _proofs[i]);
+            semaphore.validateProof(groupID, params.semaphoreProofs[i]);
         }
-
-        nonce += 1;
-        (success, returnData) = execAndReturnData(_to, _value, _data, _operation);
-
-        emit TransactionExecuted(scope, success);
     }
 
     /*----------------------------------------------------------------------*/
@@ -191,16 +152,16 @@ contract Obscurus is Module {
     /*                                                                      */
     /*----------------------------------------------------------------------*/
 
-    function setThreshold(uint256 _threshold) external onlyOwner {
-        _setThreshold(_threshold);
+    function setThreshold(uint256 _newThreshold) external override onlyOwner {
+        _setThreshold(_newThreshold);
     }
 
-    function addMember(uint256 _identityCommitment) external onlyOwner {
-        _addMember(_identityCommitment);
+    function addMember(uint256 _newMemberIdentityCommitment) external override onlyOwner {
+        _addMember(_newMemberIdentityCommitment);
     }
 
-    function addMembers(uint256[] memory _identityCommitments) external onlyOwner {
-        _addMembers(_identityCommitments);
+    function addMembers(uint256[] memory _newMembersIdentityCommitments) external override onlyOwner {
+        _addMembers(_newMembersIdentityCommitments);
     }
 
     /*----------------------------------------------------------------------*/
@@ -209,24 +170,32 @@ contract Obscurus is Module {
     /*                                                                      */
     /*----------------------------------------------------------------------*/
 
-    function _setThreshold(uint256 _threshold) internal {
-        if (_threshold == 0) {
-            revert ThresholdZero();
+    function _setThreshold(uint256 _newThreshold) internal {
+        if (_newThreshold == 0) {
+            revert InvalidThresholdZero();
         }
 
-        threshold = _threshold;
+        if (_newThreshold > numIdentities) {
+            revert InvalidThresholdTooHigh();
+        }
 
-        emit ThresholdSet(_threshold);
+        threshold = _newThreshold;
+
+        emit ThresholdSet(_newThreshold);
     }
 
     function _addMember(uint256 _identityCommitment) internal {
         semaphore.addMember(groupID, _identityCommitment);
+
+        numIdentities += 1;
 
         emit MemberAdded(_identityCommitment);
     }
 
     function _addMembers(uint256[] memory _identityCommitments) internal {
         semaphore.addMembers(groupID, _identityCommitments);
+
+        numIdentities += _identityCommitments.length;
 
         emit MembersAdded(_identityCommitments);
     }
