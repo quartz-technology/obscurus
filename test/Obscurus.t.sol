@@ -1,210 +1,329 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.27;
 
-import "./sol-utils/TestDeployer.t.sol";
-import {SemaphoreCheats} from "./sol-utils/SemaphoreCheats.sol";
-import {TestUtils} from "./sol-utils/TestUtils.sol";
+import {Enum as SafeEnum} from "safe-contracts/Safe.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {LeafAlreadyExists} from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
-contract ObscurusTest is TestDeployer, SemaphoreCheats, TestUtils {
-    uint256 private threshold;
-    SemaphoreCheatIdentity private alice;
-    SemaphoreCheatIdentity private bob;
-    SemaphoreCheatIdentity private pierre;
+import {ObscurusTestTools} from "@test-utils/ObscurusTestTools.sol";
+import {SemaphoreTestTools} from "@test-utils/SemaphoreTestTools.sol";
+import {SemaphoreIdentityArray} from "@test-utils/SemaphoreIdentityTestTools.sol";
+import {SemaphoreProofCast} from "@test-utils/SemaphoreProofTestTools.sol";
+import {IObscurus} from "@src/interfaces/IObscurus.sol";
 
-    function setUp() public {
-        threshold = 2;
-        alice = generateIdentity();
-        bob = generateIdentity();
-        pierre = generateIdentity();
+contract ObscurusTest is ObscurusTestTools, SemaphoreTestTools {
+    using SemaphoreIdentityArray for SemaphoreIdentity[];
+    using SemaphoreProofCast for SemaphoreProof;
 
-        deploy(threshold, _getAllIdentityCommitments());
+    function test_SuccessfullyDeployWithValidConfiguration() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
+
+        assertEq(obscurus.threshold(), obscurusThreshold);
+        assertEq(obscurus.nonce(), 0);
     }
 
-    function _getAllIdentities() internal view returns (SemaphoreCheatIdentity[] memory) {
-        SemaphoreCheatIdentity[] memory identities = new SemaphoreCheatIdentity[](3);
+    function test_RevertWhenDeployingWithThresholdSetToZero() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
 
-        identities[0] = alice;
-        identities[1] = bob;
-        identities[2] = pierre;
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 0;
 
-        return identities;
+        _deploySafe(safeOwnerPKs, safeThreshold);
+        _deploySemaphore();
+
+        vm.expectRevert(IObscurus.InvalidThresholdZero.selector);
+        _deployObscurus(identityCommitments, obscurusThreshold);
     }
 
-    function _getAllIdentityCommitments() internal view returns (uint256[] memory) {
-        SemaphoreCheatIdentity[] memory identities = _getAllIdentities();
-        uint256[] memory identityCommitments = new uint256[](identities.length);
+    function test_RevertWhenDeployingWithThresholdGreaterThanNumberOfIdentities() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
 
-        for (uint256 i = 0; i < identityCommitments.length; i++) {
-            identityCommitments[i] = identities[i].commitment;
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 4;
+
+        _deploySafe(safeOwnerPKs, safeThreshold);
+        _deploySemaphore();
+
+        vm.expectRevert(IObscurus.InvalidThresholdTooHigh.selector);
+        _deployObscurus(identityCommitments, obscurusThreshold);
+    }
+
+    function test_RevertWhenDeployingWithTheSameIdentityTwice() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        identities[1] = identities[0];
+
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        _deploySafe(safeOwnerPKs, safeThreshold);
+        _deploySemaphore();
+
+        vm.expectRevert(LeafAlreadyExists.selector);
+        _deployObscurus(identityCommitments, obscurusThreshold);
+    }
+
+    function test_SuccessfullyExecuteAnonymousTransactionUsingMinimumAmountOfProof() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
+
+        address to = address(0xdeadbeef);
+        vm.deal(to, 0 ether);
+
+        uint256 value = 1 ether;
+        vm.deal(address(safeInstance.safe), value);
+
+        IObscurus.TxParameters memory txParameters =
+            IObscurus.TxParameters({to: to, value: value, data: "", operation: SafeEnum.Operation.Call});
+
+        uint256 message = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(txParameters);
+
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](obscurusThreshold);
+
+        for (uint256 i = 0; i < proofs.length; i++) {
+            proofs[i] = generateProof(identities[i].privateKey, identityCommitments, message, scope).cast();
         }
 
-        return identityCommitments;
+        IObscurus.ObscureExecParameters memory obscureExecParameters =
+            IObscurus.ObscureExecParameters({txParameters: txParameters, semaphoreProofs: proofs});
+        (bool success, bytes memory returnData) = obscurus.obscureExecAndReturnData(obscureExecParameters);
+
+        assertTrue(success);
+        assertEq(returnData.length, 0);
+        assertEq(to.balance, value);
+        assertEq(address(safeInstance.safe).balance, 0);
+        assertEq(obscurus.nonce(), 1);
     }
 
-    function test_obscureTransfer() public {
-        address recipient = address(0xDEADBEEF);
-        vm.deal(recipient, 0);
+    function test_SuccessfullyExecuteAnonymousTransactionUsingMaximumAmountOfProof() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
+
+        address to = address(0xdeadbeef);
+        vm.deal(to, 0 ether);
 
         uint256 value = 1 ether;
+        vm.deal(address(safeInstance.safe), value);
 
-        uint256 signal = obscurus.computeSignal();
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+        IObscurus.TxParameters memory txParameters =
+            IObscurus.TxParameters({to: to, value: value, data: "", operation: SafeEnum.Operation.Call});
 
-        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
-        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
-        proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
+        uint256 message = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(txParameters);
 
-        (bool success,) = obscurus.obscureExecAndReturnData({
-            _to: recipient,
-            _value: value,
-            _data: "",
-            _operation: Enum.Operation.Call,
-            _proofs: proofs
-        });
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](identities.length);
 
-        assertEq(success, true);
-        assertEq(recipient.balance, value);
-        assertEq(safeInstance.safe.nonce(), 1);
+        for (uint256 i = 0; i < proofs.length; i++) {
+            proofs[i] = generateProof(identities[i].privateKey, identityCommitments, message, scope).cast();
+        }
+
+        IObscurus.ObscureExecParameters memory obscureExecParameters =
+            IObscurus.ObscureExecParameters({txParameters: txParameters, semaphoreProofs: proofs});
+        (bool success, bytes memory returnData) = obscurus.obscureExecAndReturnData(obscureExecParameters);
+
+        assertTrue(success);
+        assertEq(returnData.length, 0);
+        assertEq(to.balance, value);
+        assertEq(address(safeInstance.safe).balance, 0);
+        assertEq(obscurus.nonce(), 1);
     }
 
-    function test_multiObscureTransfer() public {
-        vm.deal(address(safeInstance.safe), 3 ether);
+    function test_SuccessfullyExecuteMultipleAnonymousTransactions() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
 
-        address recipient = address(0xDEADBEEF);
-        vm.deal(recipient, 0);
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
 
-        uint256 value = 1 ether;
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
 
-        for (uint256 i = 0; i < 3; i++) {
-            uint256 signal = obscurus.computeSignal();
-            uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-            ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+        address to = address(0xdeadbeef);
+        vm.deal(to, 0 ether);
 
-            proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
-            proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
-            proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
+        uint256 safeInitBalance = 3 ether;
+        vm.deal(address(safeInstance.safe), safeInitBalance);
 
-            (bool success,) = obscurus.obscureExecAndReturnData({
-                _to: recipient,
-                _value: value,
-                _data: "",
-                _operation: Enum.Operation.Call,
-                _proofs: proofs
-            });
+        uint256 numTransactions = 3;
 
-            assertEq(success, true);
+        for (uint256 i = 0; i < numTransactions; i++) {
+            uint256 value = 1 ether;
+
+            IObscurus.TxParameters memory txParameters =
+                IObscurus.TxParameters({to: to, value: value, data: "", operation: SafeEnum.Operation.Call});
+
+            uint256 message = obscurus.computeSignal();
+            uint256 scope = obscurus.computeScope(txParameters);
+            ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](identities.length);
+
+            for (uint256 j = 0; j < proofs.length; j++) {
+                proofs[j] = generateProof(identities[j].privateKey, identityCommitments, message, scope).cast();
+            }
+
+            IObscurus.ObscureExecParameters memory obscureExecParameters =
+                IObscurus.ObscureExecParameters({txParameters: txParameters, semaphoreProofs: proofs});
+            (bool success, bytes memory returnData) = obscurus.obscureExecAndReturnData(obscureExecParameters);
+
+            assertTrue(success);
+            assertEq(returnData.length, 0);
+            assertEq(to.balance, value * (i + 1));
+            assertEq(address(safeInstance.safe).balance, safeInitBalance - value * (i + 1));
             assertEq(obscurus.nonce(), i + 1);
-            assertEq(recipient.balance, value * (i + 1));
         }
     }
 
-    function test_cannot_execWithoutMissingProofs() public {
-        address recipient = address(0xDEADBEEF);
-        vm.deal(recipient, 0);
+    function test_RevertWhenExecutingTransactionUsingNotEnoughProofs() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
+
+        address to = address(0xdeadbeef);
+        vm.deal(to, 0 ether);
 
         uint256 value = 1 ether;
+        vm.deal(address(safeInstance.safe), value);
 
-        uint256 signal = obscurus.computeSignal();
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](1);
+        IObscurus.TxParameters memory txParameters =
+            IObscurus.TxParameters({to: to, value: value, data: "", operation: SafeEnum.Operation.Call});
 
-        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
+        uint256 message = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(txParameters);
 
-        vm.expectRevert(NotEnoughProofs.selector);
-        obscurus.obscureExecAndReturnData({
-            _to: recipient,
-            _value: value,
-            _data: "",
-            _operation: Enum.Operation.Call,
-            _proofs: proofs
-        });
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](obscurusThreshold - 1);
 
-        assertEq(recipient.balance, 0);
+        for (uint256 i = 0; i < proofs.length; i++) {
+            proofs[i] = generateProof(identities[i].privateKey, identityCommitments, message, scope).cast();
+        }
+
+        IObscurus.ObscureExecParameters memory obscureExecParameters =
+            IObscurus.ObscureExecParameters({txParameters: txParameters, semaphoreProofs: proofs});
+
+        vm.expectRevert(IObscurus.InvalidExecutionNotEnoughProofs.selector);
+        (bool success, bytes memory returnData) = obscurus.obscureExecAndReturnData(obscureExecParameters);
+
+        assertFalse(success);
+        assertEq(returnData.length, 0);
+        assertEq(to.balance, 0);
+        assertEq(address(safeInstance.safe).balance, value);
         assertEq(obscurus.nonce(), 0);
     }
 
-    function test_cannot_execWithInvalidProof() public {
-        address recipient = address(0xDEADBEEF);
-        vm.deal(recipient, 0);
+    function test_RevertWhenExecutingTransactionUsingInvalidScope() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
+
+        address to = address(0xdeadbeef);
+        vm.deal(to, 0 ether);
 
         uint256 value = 1 ether;
+        vm.deal(address(safeInstance.safe), value);
 
-        uint256 signal = obscurus.computeSignal();
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+        IObscurus.TxParameters memory txParameters =
+            IObscurus.TxParameters({to: to, value: value, data: "", operation: SafeEnum.Operation.Call});
 
-        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
-        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
-        proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope);
+        uint256 message = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(txParameters);
 
-        // Invalidate Alice's proof.
-        proofs[0].points[0] += 1;
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](identities.length);
 
-        vm.expectRevert(ISemaphore.Semaphore__InvalidProof.selector);
-        obscurus.obscureExecAndReturnData({
-            _to: recipient,
-            _value: value,
-            _data: "",
-            _operation: Enum.Operation.Call,
-            _proofs: proofs
-        });
+        for (uint256 i = 0; i < proofs.length - 1; i++) {
+            proofs[i] = generateProof(identities[i].privateKey, identityCommitments, message, scope).cast();
+        }
 
-        assertEq(recipient.balance, 0);
+        proofs[proofs.length - 1] =
+            generateProof(identities[proofs.length - 1].privateKey, identityCommitments, message, scope + 1).cast();
+
+        IObscurus.ObscureExecParameters memory obscureExecParameters =
+            IObscurus.ObscureExecParameters({txParameters: txParameters, semaphoreProofs: proofs});
+
+        vm.expectRevert(IObscurus.InvalidExecutionScope.selector);
+        (bool success, bytes memory returnData) = obscurus.obscureExecAndReturnData(obscureExecParameters);
+
+        assertFalse(success);
+        assertEq(returnData.length, 0);
+        assertEq(to.balance, 0);
+        assertEq(address(safeInstance.safe).balance, value);
         assertEq(obscurus.nonce(), 0);
     }
 
-    function test_cannot_execWithInvalidScope() public {
-        address recipient = address(0xDEADBEEF);
-        vm.deal(recipient, 0);
+    function test_RevertWhenExecutingTransactionUsingInvalidSignal() public {
+        (, uint256[] memory safeOwnerPKs) = generateAccounts(3);
+        uint256 safeThreshold = 1;
+
+        SemaphoreIdentity[] memory identities = generateIdentities(3);
+        uint256[] memory identityCommitments = identities.commitments();
+        uint256 obscurusThreshold = 2;
+
+        deploySafeAndObscurus(safeOwnerPKs, safeThreshold, identityCommitments, obscurusThreshold);
+
+        address to = address(0xdeadbeef);
+        vm.deal(to, 0 ether);
 
         uint256 value = 1 ether;
+        vm.deal(address(safeInstance.safe), value);
 
-        uint256 signal = obscurus.computeSignal();
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+        IObscurus.TxParameters memory txParameters =
+            IObscurus.TxParameters({to: to, value: value, data: "", operation: SafeEnum.Operation.Call});
 
-        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
-        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
-        proofs[2] = generateProof(pierre, _getAllIdentities(), signal, scope + 1);
+        uint256 message = obscurus.computeSignal();
+        uint256 scope = obscurus.computeScope(txParameters);
 
-        vm.expectRevert(InvalidScope.selector);
-        obscurus.obscureExecAndReturnData({
-            _to: recipient,
-            _value: value,
-            _data: "",
-            _operation: Enum.Operation.Call,
-            _proofs: proofs
-        });
+        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](identities.length);
 
-        assertEq(recipient.balance, 0);
-        assertEq(obscurus.nonce(), 0);
-    }
+        for (uint256 i = 0; i < proofs.length - 1; i++) {
+            proofs[i] = generateProof(identities[i].privateKey, identityCommitments, message, scope).cast();
+        }
 
-    function test_cannot_execWithInvalidSignal() public {
-        address recipient = address(0xDEADBEEF);
-        vm.deal(recipient, 0);
+        proofs[proofs.length - 1] =
+            generateProof(identities[proofs.length - 1].privateKey, identityCommitments, message + 1, scope).cast();
 
-        uint256 value = 1 ether;
+        IObscurus.ObscureExecParameters memory obscureExecParameters =
+            IObscurus.ObscureExecParameters({txParameters: txParameters, semaphoreProofs: proofs});
 
-        uint256 signal = obscurus.computeSignal();
-        uint256 scope = obscurus.computeScope(recipient, value, "", Enum.Operation.Call);
-        ISemaphore.SemaphoreProof[] memory proofs = new ISemaphore.SemaphoreProof[](3);
+        vm.expectRevert(IObscurus.InvalidExecutionSignal.selector);
+        (bool success, bytes memory returnData) = obscurus.obscureExecAndReturnData(obscureExecParameters);
 
-        proofs[0] = generateProof(alice, _getAllIdentities(), signal, scope);
-        proofs[1] = generateProof(bob, _getAllIdentities(), signal, scope);
-        proofs[2] = generateProof(pierre, _getAllIdentities(), signal + 1, scope);
-
-        vm.expectRevert(InvalidSignal.selector);
-        obscurus.obscureExecAndReturnData({
-            _to: recipient,
-            _value: value,
-            _data: "",
-            _operation: Enum.Operation.Call,
-            _proofs: proofs
-        });
-
-        assertEq(recipient.balance, 0);
+        assertFalse(success);
+        assertEq(returnData.length, 0);
+        assertEq(to.balance, 0);
+        assertEq(address(safeInstance.safe).balance, value);
         assertEq(obscurus.nonce(), 0);
     }
 }
