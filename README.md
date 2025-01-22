@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-    Anonymous K/M signature scheme for Safe Wallet, built using Semaphore and Zodiac.
+    Privacy layer for Safe Wallet owners, built using Semaphore and Zodiac.
 </p>
 
 ## Table of Contents
@@ -13,6 +13,7 @@
 - [Disclaimer](#disclaimer)
 - [Acknowledgements](#acknowledgments)
 - [Introduction](#introduction)
+- [Architecture](#architecture)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
 - [Authors](#authors)
@@ -39,7 +40,27 @@ We wanted to thank the following entities / persons for their precious help. Thi
 
 ## Introduction
 
+As a reminder, a multi-signature wallet such as Safe Wallet is a smart contract that requires multiple approvals (or "signatures") to complete a transaction.
+For example, when creating a 2/3 Safe, 3 different owners will control the multisig and all the transactions it will execute first need to be approved by at least 2 out of the 3 owners (with 2 being referred to as the "threshold").
+
+Although this provides an amazing security solution to manage assets and perform operations, the mechanism that verifies the approvals leaks the identity of the owners who emitted those: everyone is able to know which ones of the owners approved an operation and by deduction which ones have not.
+
+This is where Obscurus comes into play. It provides a privacy layer on top of Safe in the form of a Zodiac Module - additional logic that can be attached to Safe Wallets and able to bypass the default signatures verification mechanism.
+
+It guarantees the following:
+- A set of owners (or "identities") control the Obscurus Module.
+- Identities can submit anonymous approvals for operation to be executed by the Safe this Module is attached to.
+- A number of anonymous approvals (the "threshold") still needs to be reached prior to execute the operation.
+- It is impossible to identify which identity submitted which approval (the "anonymous" property).
+- The identities submitting the anonymous approvals are part of the group controlling the Module (as opposed to external - "unauthorized" - identities).
+
+## Architecture
+
+Coming soon.
+
 ## Getting Started
+
+Coming soon.
 
 ## Contributing
 
