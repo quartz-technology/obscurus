@@ -109,6 +109,7 @@ contract Obscurus is Module, IObscurus {
         address obscurusAddress = address(this);
         uint256 chainID;
 
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             chainID := chainid()
         }
