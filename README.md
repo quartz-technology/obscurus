@@ -13,6 +13,7 @@
 - [Disclaimer](#disclaimer)
 - [Acknowledgements](#acknowledgments)
 - [Introduction](#introduction)
+- [Overview](#overview)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
@@ -54,17 +55,147 @@ It guarantees the following:
 - It is impossible to identify which identity submitted which approval (the "anonymous" property).
 - The identities submitting the anonymous approvals are part of the group controlling the Module (as opposed to external - "unauthorized" - identities).
 
+## Overview
+
+1. A set of owners control a Safe Wallet.
+
+    ```mermaid
+    flowchart TD
+        Alice ---|Control| SW[Safe Wallet]
+        Bob ---|Control| SW[Safe Wallet]
+        Charlie ---|Control| SW[Safe Wallet]
+    ```
+---
+
+2. Each Safe Wallet owner generates its own Semaphore identity.
+
+    ```mermaid
+    flowchart TD
+        Alice ---|Generates| IA[Identity A]
+        Bob ---|Generates| IB[Identity B]
+        Charlie ---|Generates| IC[Identity C]
+    ```
+
+---
+
+3. The Obscurus Module is deployed using the identities.
+
+    ```mermaid
+    flowchart TB
+        Deployer ---|Deploys| OM[Obscurus Module]
+        subgraph Obscurus
+            IA[Identity A] --> OM[Obscurus Module]
+            IB[Identity B] --> OM[Obscurus Module]
+            IC[Identity C] --> OM[Obscurus Module]
+            Threshold --> OM[Obscurus Module]
+        end
+    ```
+
+---
+
+4. The Safe Wallet owners attach the Obscurus Module.
+
+    ```mermaid
+    flowchart TB
+        Alice ---|Approve module attachment| SW[Safe Wallet]
+        Bob ---|Approve module attachment| SW[Safe Wallet]
+        Charlie ---|Approve module attachment| SW[Safe Wallet]
+        SW[Safe Wallet] ---|Attach Module| OM[Obscurus Module]
+    ```
+
+---
+
+5. The Obscurus identities generate anonymous approvals.
+
+    ```mermaid
+    flowchart TB
+        IA[Identity A] ---|Generates| AAA[Anonymous Approval]
+        IB[Identity B] ---|Generates| AAB[Anonymous Approval]
+        IC[Identity C] ---|Generates| AAC[Anonymous Approval]
+    ```
+
+---
+
+6. The anonymous approvals are collected by a Relay. At this point, it is impossible to know which of the identities generated which approval.
+
+    ```mermaid
+    flowchart TB
+        Relay ---|Collects| AAA[Anonymous Approval]
+        Relay ---|Collects| AAB[Anonymous Approval]
+        Relay ---|Collects| AAC[Anonymous Approval]
+    ```
+
+---
+
+7. The Relay submits the anonymous approvals to the Obscurus Module, which verifies them onchain and executes the operation via the Safe Wallet.
+
+    ```mermaid
+    flowchart LR
+        Relay ---|Submits anonymous approvals| OM[Obscurus Module]
+        subgraph Verification
+            direction TB
+            OM[Obscurus Module] ---|Verifies approvals| SV[Semaphore Verifier]
+            subgraph Execution
+                direction LR
+                SV[Semaphore Verifier] ---|Approvals are valid| SW[Safe Wallet]
+            end
+            SV[Semaphore Verifier] ---|Approvals are invalid| Revert
+        end
+    ```
+
 ## Architecture
 
-Coming soon.
+Note: This diagram is not complete, please refer to the code or overview for more up-to-date information about how Obscurus works.
+
+```mermaid
+classDiagram
+    Identity --> Relay : Sends approvals and associated proofs
+    Relay --> Obscurus : Triggers verification and execution
+    Obscurus --|> Zodiac Module : Implements
+    Obscurus --> Safe Wallet : Is attached to
+    Obscurus --> Semaphore : Uses
+    Safe Wallet --> EOA: Interacts with
+    Safe Wallet --> Contract: Interacts with
+    class Safe Wallet{
+        +[]Address owners
+        +Int threshold
+        +enableModule()
+        +executeFromModule()
+    }
+    class Obscurus{
+        +[]Int identities
+        +Int threshold
+        +setUp()
+        +obscureExec()
+        +obscureExecAndReturnData()
+    }
+    class Semaphore{
+        +validateProofs()
+    }
+    class Zodiac Module{
+        +setUp()*
+        +exec()
+        +execAndReturnData()
+    }
+    class Relay{
+    }
+    class Identity{
+        +Bytes approval
+        +Byte approvalProof
+    }
+    class EOA{
+    }
+    class Contract{
+    }
+```
 
 ## Getting Started
 
-Coming soon.
+You can check out the [dedicated file](./GETTING_STARTED.md) to start using Obscurus, from deploying to a local environment to interacting with the contracts.
 
 ## Contributing
 
-Coming soon.
+We welcome all contributions! Please take a look at the [dedicated file](./CONTRIBUTING.md) if you want to learn more.
 
 ## Authors
 
